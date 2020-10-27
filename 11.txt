@@ -1,0 +1,5 @@
+Bob -> Max : 1
+Bob -> Max : 2
+Bob -> Max : 3
+Bob -> Max : 4
+Max -> Bob : 110
