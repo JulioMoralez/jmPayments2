@@ -1,35 +1,32 @@
 package pack
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.Date
 
 import akka.actor.Actor
+import akka.event.{Logging, LoggingAdapter}
 
-class LogPayment extends Actor{
+case class ErrorMessage(message: String)
+case class AddJournalMessage(message: String)
+
+class LogPayment extends Actor with FileUtils {
 
   // два файла логов
-  val errorFilename: String = "Error.log"
-  val journalFilename: String = "Journal.log"
-
-  def write(message: String, filename: String): Unit = {
-    val path = Paths.get(filename)
-    val option = if (Files.exists(path)) StandardOpenOption.APPEND else StandardOpenOption.CREATE
-    Files.write(path, (message + "\n").getBytes(StandardCharsets.UTF_8), option)
-  }
+  val errorFilename: String = MyConfiguration.errorFilename
+  val journalFilename: String = MyConfiguration.journalFilename
+  val log: LoggingAdapter = Logging(context.system, this)
 
   override def preStart(): Unit = {
     val now:String = "\n" + new Date().toString
-    write(now, errorFilename)
-    write(now, journalFilename)
+    writeToFile(now, errorFilename)
+    writeToFile(now, journalFilename)
   }
 
   def receive: Receive = {
     case ErrorMessage(message) =>
-      println("LogIncorrectPayment: " + message)
-      write(message, errorFilename)
+      log.error(message)
+      writeToFile(message, errorFilename)
     case AddJournalMessage(message) =>
-      println("Journal: " + message)
-      write(message, journalFilename)
+      log.info(message)
+      writeToFile(message, journalFilename)
   }
 }
