@@ -1,4 +1,4 @@
 Bob -> Max: 1
 Bob -> Max: 2
 Bob -> Max: 3
-Max -> Sam: 106
+Max -> Bob: 106

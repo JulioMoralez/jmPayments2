@@ -1,4 +1,4 @@
-package pack
+package ru.juliomoralez.payment.actors
 
 import java.io.File
 import java.nio.file.Path
@@ -9,7 +9,7 @@ import akka.dispatch.MessageDispatcher
 import akka.pattern.ask
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.{ByteString, Timeout}
-import pack.MyConfiguration.{dir, fileFilter}
+import ru.juliomoralez.payment.config.PaymentConfig.{dir, fileFilter}
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
@@ -56,7 +56,7 @@ class PaymentsReader(implicit system: ActorSystem, logPayment: ActorRef) extends
           createActor(p1)
           createActor(p2)
 
-        (users(p1), Payment(PaymentSign("-"), value, users(p2)))
+        (users(p1), Payment(Minus, value, users(p2)))
       }
 
       // выбираем файлы из папки dir по маске filter

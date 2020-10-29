@@ -1,16 +1,17 @@
-package pack
+package ru.juliomoralez.payment.actors
 
 import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
-import pack.MyConfiguration.usersStartValue
+import ru.juliomoralez.payment.config.UserConfig.usersStartValue
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
-case class PaymentSign(sign: String) {
-  override def toString: String = sign
-}
+sealed class PaymentSign
+case object Plus extends PaymentSign
+case object Minus extends PaymentSign
+
 case class Payment(sign: PaymentSign, value: Long, participant: ActorRef)
 case object StopPayment
 
@@ -27,23 +28,22 @@ class PaymentParticipant(logPayment: ActorRef) extends Actor{
 
   def receive: Receive = {
     case Payment(paymentSign, v, participant) =>
-      if (paymentSign.sign == "+") {
-        value += v
-        logPayment ! AddJournalMessage(s"Операция '+' ${participant.path.name} -> ${self.path.name} : $v успешна. Баланс ${self.path.name} = $value")
-      }
-      if (paymentSign.sign == "-") {
-        if ((value - v) >= 0) {
+      paymentSign match {
+        case Plus =>
+          value += v
+          logPayment ! AddJournalMessage(s"Операция '+' ${participant.path.name} -> ${self.path.name} : $v успешна. Баланс ${self.path.name} = $value")
+        case Minus =>
+          if ((value - v) >= 0) {
           value -= v
-          val future: Future[Any] = participant.ask(Payment(PaymentSign("+"), v, self))
+          val future: Future[Any] = participant.ask(Payment(Plus, v, self))
           Await.result(future, timeout.duration)
           logPayment ! AddJournalMessage(s"Операция '-' ${self.path.name} -> ${participant.path.name} : $v успешна. Баланс ${self.path.name} = $value")
         } else {
           self ! StopPayment
         }
       }
-      sender ! ()
+      sender ! false
     case StopPayment =>
       logPayment ! AddJournalMessage(  s"Отмена. Недостаточно средств. Баланс ${self.path.name} = $value")
-
   }
 }
