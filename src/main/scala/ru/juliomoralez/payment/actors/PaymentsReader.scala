@@ -9,13 +9,17 @@ import akka.dispatch.MessageDispatcher
 import akka.pattern.ask
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.{ByteString, Timeout}
-import ru.juliomoralez.payment.config.PaymentConfig.{dir, fileFilter}
+import ru.juliomoralez.payment.config.PaymentConfig.{dir, fileFilter, regex}
 
 import scala.collection.mutable
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
 
 case object Start
+
+sealed trait Transaction
+case class GoodTransaction(from: String, to: String, value: Long) extends Transaction
+case object BadTransaction extends Transaction
 
 class PaymentsReader(implicit system: ActorSystem, logPayment: ActorRef) extends Actor {
 
@@ -27,36 +31,31 @@ class PaymentsReader(implicit system: ActorSystem, logPayment: ActorRef) extends
     case Start =>
 
       // проверка входной строки на <NAME1> -> <NAME2>: <VALUE>
-      def paymentChecker(payment: String): Boolean = {
-        val checked: Boolean = payment.matches("[\\w]+ -> [\\w]+: [ \\d]+")
-        if (checked) {
-          logPayment ! AddJournalMessage(payment)
-        } else {
-          logPayment ! ErrorMessage(s"$payment - ошибка в строке")
+      def paymentChecker(payment: String): Transaction = {
+        payment match {
+          case regex(from, _, to, _, value) =>
+            logPayment ! AddJournalMessage(payment)
+            GoodTransaction(from, to, value.toLong)
+          case _ =>
+            logPayment ! ErrorMessage(s"$payment - ошибка в строке")
+            BadTransaction
         }
-        checked
       }
 
-      // получаем из <NAME1> -> <NAME2>: <VALUE>
-      def parsePayment(s: String): (ActorRef, Payment) = {
-          val sep1: Int = s.indexOf("->")
-          val sep2: Int = s.indexOf(":")
-          val p1: String = s.substring(0, sep1).trim
-          val p2: String = s.substring(sep1 + 2, sep2).trim
-          val value: Long = Try {
-            s.substring(sep2 + 1, s.length).trim.toLong
-          }.getOrElse(-1) // -1 если не удалось получить сумму из операции
-
+      def executePayment(p: Transaction): Future[Any] = {
           def createActor(name: String): Unit = {
             if (!users.contains(name)) {
               val paymentParticipant: ActorRef = system.actorOf(Props(classOf[PaymentParticipant], logPayment), name)
               users += (name -> paymentParticipant)
             }
           }
-          createActor(p1)
-          createActor(p2)
+          p match {
+            case GoodTransaction(from, to, value) =>
+              createActor(from)
+              createActor(to)
+              users(from).ask(Payment(Minus, value, users(to)))
+          }
 
-        (users(p1), Payment(Minus, value, users(p2)))
       }
 
       // выбираем файлы из папки dir по маске filter
@@ -80,10 +79,11 @@ class PaymentsReader(implicit system: ActorSystem, logPayment: ActorRef) extends
       val source: Source[String, NotUsed] = Source(sources).flatMapConcat(identity)
 
       //основной стрим
-      source.filter(paymentChecker).mapAsync(1)(p => {
-        val (user, payment): (ActorRef, Payment) = parsePayment(p)
-        if (payment.value >= 0) user.ask(payment) else logPayment.ask(AddJournalMessage("сумма в операции некорректна"))
-      }).run()
+      source
+        .map(paymentChecker)
+        .filter(_ != BadTransaction)
+        .mapAsync(1)(executePayment)
+        .run()
 
   }
 }

@@ -3,7 +3,7 @@ package ru.juliomoralez.payment.actors
 import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
-import ru.juliomoralez.payment.config.UserConfig.usersStartValue
+import ru.juliomoralez.payment.config.UsersConfig.usersStartValue
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}

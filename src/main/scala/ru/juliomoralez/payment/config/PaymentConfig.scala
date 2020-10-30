@@ -3,6 +3,7 @@ package ru.juliomoralez.payment.config
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.util.Try
+import scala.util.matching.Regex
 
 object PaymentConfig {
   val config: Config = ConfigFactory.load()
@@ -12,6 +13,7 @@ object PaymentConfig {
   val journalFilename: String = get("journalFilename").getOrElse("Journal.log")
   val dir: String = get("dir").getOrElse(".")
   val fileFilter: String = get("fileFilter").getOrElse("")
+  val regex: Regex = get("regex").getOrElse("").r
 
   // чтение поля из файла application.conf
   def get(field: String): Try[String] = {
