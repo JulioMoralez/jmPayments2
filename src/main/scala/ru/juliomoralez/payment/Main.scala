@@ -1,22 +1,46 @@
 package ru.juliomoralez.payment
 
+import java.io.File
+
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.event.LoggingAdapter
+import com.typesafe.config.ConfigFactory
 import ru.juliomoralez.payment.actors.{LogPayment, PaymentsReader, Start}
-import ru.juliomoralez.payment.config.{PaymentConfig, UsersConfig}
+import ru.juliomoralez.payment.config.{PaymentConfig, ProgramConfig, UsersConfig}
+import ru.juliomoralez.payment.util.LoggerFactory
 
-object Main extends App {
+import scala.util.Try
 
-  // проверяем файлы конфигов на старте. В случае ошибки сразу падаем и не продолжаем программу
-  PaymentConfig
-  UsersConfig
+object Main extends LoggerFactory{
 
   implicit val system: ActorSystem = ActorSystem("system")
+  lazy private val log: LoggingAdapter = newLogger(system)
+  val usersFileName: String = "src/main/resources/users.conf"
 
-  val logPayment: ActorRef = system.actorOf(Props[LogPayment](), "logPayment")
+  def main(args: Array[String]): Unit = {
+    safeReadConfig().fold(terminateProgram, starting)
+    Thread.sleep(20000)
+    system.terminate()
+  }
 
-  val paymentsReader: ActorRef = system.actorOf(Props(classOf[PaymentsReader], system, logPayment), "paymentsReader")
-  paymentsReader ! Start
+  private def safeReadConfig(): Try[ProgramConfig] = {
+    Try{
+      val paymentConfig: PaymentConfig = PaymentConfig(ConfigFactory.load())
+      val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(usersFileName)))
+      ProgramConfig(paymentConfig, usersConfig)
+    }
+  }
 
-  Thread.sleep(20000)
-  system.terminate()
+  private def starting(programConfig: ProgramConfig): Unit = {
+    val logPayment: ActorRef = system.actorOf(Props(classOf[LogPayment], log, programConfig), "logPayment")
+    val paymentsReader: ActorRef = system.actorOf(Props(classOf[PaymentsReader], system, log, logPayment, programConfig), "paymentsReader")
+    paymentsReader ! Start
+  }
+
+
+  private def terminateProgram(ex: Throwable): Unit = {
+    log.error("Program error " + ex)
+    log.info("Terminating the actor system")
+    system.terminate()
+  }
 }

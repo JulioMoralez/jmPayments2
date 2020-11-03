@@ -1,13 +1,15 @@
 package ru.juliomoralez.payment.config
 
-import java.io.File
-
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
+final case class UsersConfig(usersStartValue: Map[String, Long])
+
 object UsersConfig {
-  val config: Config = ConfigFactory.parseFile(new File("src/main/resources/users.conf"))
-  val usersStartValue: Map[String, Long] = config.getConfigList("users").asScala
-    .map(u => u.getString("name").trim -> u.getLong("balance")).toMap
+  def apply(config: Config): UsersConfig = {
+    val usersStartValue: Map[String, Long] = config.getConfigList("users").asScala
+      .map(u => u.getString("name").trim -> u.getLong("balance")).toMap
+    new UsersConfig(usersStartValue)
+  }
 }

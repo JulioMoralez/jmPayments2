@@ -1,7 +1,7 @@
 package ru.juliomoralez.payment.develop
 
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorSystem, Behavior}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import ru.juliomoralez.payment.develop.PaymentParticipant.paymentParticipant
 
 
@@ -10,7 +10,7 @@ case object Plus extends PaymentSign
 case object Minus extends PaymentSign
 
 sealed trait PaymentOperation
-case class Payment(sign: PaymentSign, value: Long, participant: ActorSystem[PaymentOperation]) extends PaymentOperation
+case class Payment(sign: PaymentSign, value: Long, participant: ActorRef[PaymentOperation]) extends PaymentOperation
 case object StopPayment extends PaymentOperation
 case object PrintValue extends PaymentOperation
 
@@ -20,21 +20,17 @@ object PaymentParticipant {
     Behaviors.receive { (context, message) =>
 
       message match {
-        case Payment(paymentSign, v, participant) =>
-          paymentSign match {
-            case Minus =>
-              if ((value - v) >= 0) {
-                println(Minus)
-                paymentParticipant(value - v)
-              } else {
-                println("отмена1")
-                StopPayment
-                Behaviors.same
-              }
-            case Plus =>
-              println(Plus)
-              paymentParticipant(value + v)
+        case Payment(Minus, v, _) =>
+          if ((value - v) >= 0) {
+            println(Minus)
+            paymentParticipant(value - v)
+          } else {
+            println("отмена1")
+            StopPayment
+            Behaviors.same
           }
+        case Payment(Plus, v, _) =>
+          paymentParticipant(value + v)
         case StopPayment =>
           println("отмена")
           Behaviors.same

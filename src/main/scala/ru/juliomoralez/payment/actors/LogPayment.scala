@@ -4,19 +4,17 @@ import java.util.Date
 
 import akka.actor.Actor
 import akka.event.LoggingAdapter
-import ru.juliomoralez.payment.config.PaymentConfig
+import ru.juliomoralez.payment.config.ProgramConfig
 import ru.juliomoralez.payment.util.FileUtils.writeToFile
-import ru.juliomoralez.payment.util.LoggerFactory
 
 case class ErrorMessage(message: String)
 case class AddJournalMessage(message: String)
 
-class LogPayment extends Actor with LoggerFactory {
+class LogPayment(log: LoggingAdapter, programConfig: ProgramConfig) extends Actor {
 
   // два файла логов
-  val errorFilename: String = PaymentConfig.errorFilename
-  val journalFilename: String = PaymentConfig.journalFilename
-  val log: LoggingAdapter = newLogger(context.system)
+  val errorFilename: String = programConfig.paymentConfig.errorFilename
+  val journalFilename: String = programConfig.paymentConfig.journalFilename
 
   override def preStart(): Unit = {
     val now:String = "\n" + new Date().toString

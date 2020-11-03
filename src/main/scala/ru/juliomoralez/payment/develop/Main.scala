@@ -26,7 +26,9 @@ object Reader {
         }
         (1 to 3).foreach(createActor("a", _)) // нормально создаются 3 штуки
         implicit val c: ActorSystem[Nothing] = context.system
-        Source(1 to 3).runForeach(x => {println(x); createActor("b", x)}) // печатает один раз x и останавливается на spawn
+        Source(1 to 3).runForeach(x => {
+          println(x);
+          createActor("b", x)}) // печатает один раз x и останавливается на spawn
         println("end")
         Behaviors.same
       }

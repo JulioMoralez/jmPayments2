@@ -1,88 +1,66 @@
 package ru.juliomoralez.payment.actors
 
-import java.io.File
-import java.nio.file.Path
+import java.io.StreamCorruptedException
+import java.nio.file.{Files, Path, Paths}
 
 import akka.NotUsed
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.dispatch.MessageDispatcher
+import akka.event.LoggingAdapter
 import akka.pattern.ask
+import akka.stream.{ActorAttributes, Supervision}
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.{ByteString, Timeout}
-import ru.juliomoralez.payment.config.PaymentConfig.{dir, fileFilter, regex}
+import ru.juliomoralez.payment.config.ProgramConfig
+import ru.juliomoralez.payment.util.LoggerFactory
 
-import scala.collection.mutable
-import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 case object Start
 
-sealed trait Transaction
-case class GoodTransaction(from: String, to: String, value: Long) extends Transaction
-case object BadTransaction extends Transaction
-
-class PaymentsReader(implicit system: ActorSystem, logPayment: ActorRef) extends Actor {
+class PaymentsReader(implicit system: ActorSystem, log: LoggingAdapter, logPayment: ActorRef, programConfig: ProgramConfig) extends Actor with LoggerFactory {
 
   implicit val blockingExecutionContext: MessageDispatcher = system.dispatchers.lookup("blocking-dispatcher")
   implicit val timeout: Timeout = 5.seconds
-  val users: mutable.Map[String, ActorRef] = mutable.Map()
+  val fileDir: String = programConfig.paymentConfig.fileDir
+  val fileRegex: String = programConfig.paymentConfig.fileRegex
 
   def receive: Receive = {
     case Start =>
 
-      // проверка входной строки на <NAME1> -> <NAME2>: <VALUE>
-      def paymentChecker(payment: String): Transaction = {
-        payment match {
-          case regex(from, _, to, _, value) =>
-            logPayment ! AddJournalMessage(payment)
-            GoodTransaction(from, to, value.toLong)
-          case _ =>
-            logPayment ! ErrorMessage(s"$payment - ошибка в строке")
-            BadTransaction
-        }
+      val paymentChecker: ActorRef = system.actorOf(Props(classOf[PaymentChecker], system, logPayment, programConfig), "paymentChecker")
+
+      def getFiles(fileDir: String, fileRegex: String): Iterator[Path] = {
+        Files
+          .list(Paths.get(fileDir))
+          .filter(_.getFileName.toString.matches(fileRegex))
+          .iterator()
+          .asScala
       }
 
-      def executePayment(p: Transaction): Future[Any] = {
-          def createActor(name: String): Unit = {
-            if (!users.contains(name)) {
-              val paymentParticipant: ActorRef = system.actorOf(Props(classOf[PaymentParticipant], logPayment), name)
-              users += (name -> paymentParticipant)
-            }
-          }
-          p match {
-            case GoodTransaction(from, to, value) =>
-              createActor(from)
-              createActor(to)
-              users(from).ask(Payment(Minus, value, users(to)))
-          }
+      val source: Source[String, NotUsed] = Source
+        .fromIterator(() => getFiles(fileDir, fileRegex))
+        .flatMapConcat(
+          FileIO.fromPath(_).via(Framing.delimiter(ByteString(System.lineSeparator()), 128, allowTruncation = true)
+            .map(_.utf8String)).filter(!_.isEmpty))
 
+      def decider(): Supervision.Decider = {
+        case _: StreamCorruptedException =>
+          log.error("Incoming stream has incorrect element. Ignore")
+          Supervision.Resume
+        case ex: RuntimeException =>
+          log.error(s"Incoming stream has RuntimeException: $ex. Stop")
+          Supervision.Stop
+        case ex =>
+          log.error(s"Incoming stream has unhandled exception: $ex. Restart")
+          Supervision.Restart
       }
-
-      // выбираем файлы из папки dir по маске filter
-      def files: Vector[Path] = {
-        val files: Array[File] = new File(dir).listFiles()
-        if (files != null) {
-          files.filter(x => x.isFile && x.getName.indexOf(fileFilter) >= 0).map(_.toPath).toVector
-        } else { // Что лучше делать в случае ошибки чтения? аварийно остановить всё?
-          // throw new RuntimeException("Ошибка чтения исходных файлов с операциями")
-          Vector()
-        }
-      }
-
-      val sources = files
-        .map(
-          FileIO
-            .fromPath(_)
-            .via(Framing.delimiter(ByteString(System.lineSeparator()), Int.MaxValue, allowTruncation = true)
-              .map(_.utf8String)).filter(!_.isEmpty)
-        )
-      val source: Source[String, NotUsed] = Source(sources).flatMapConcat(identity)
 
       //основной стрим
       source
-        .map(paymentChecker)
-        .filter(_ != BadTransaction)
-        .mapAsync(1)(executePayment)
+        .mapAsync(1)(x => paymentChecker.ask(CheckTransaction(x)))
+        .addAttributes(ActorAttributes.supervisionStrategy(decider()))
         .run()
 
   }

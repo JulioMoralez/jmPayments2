@@ -1,25 +1,22 @@
 package ru.juliomoralez.payment.config
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 
-import scala.util.Try
-import scala.util.matching.Regex
+final case class PaymentConfig(
+    fileDir: String,
+    fileRegex: String,
+    paymentRegex: String,
+    journalFilename: String,
+    errorFilename: String)
 
-object PaymentConfig {
-  val config: Config = ConfigFactory.load()
+object PaymentConfig extends Serializable {
 
-  // в случае отсутствия полей в application.conf используем значения по умолчанию и продолжаем работу
-  val errorFilename: String = get("errorFilename").getOrElse("Error.log")
-  val journalFilename: String = get("journalFilename").getOrElse("Journal.log")
-  val dir: String = get("dir").getOrElse(".")
-  val fileFilter: String = get("fileFilter").getOrElse("")
-  val regex: Regex = get("regex").getOrElse("").r
-
-  // чтение поля из файла application.conf
-  def get(field: String): Try[String] = {
-    Try {
-      config.getString("app." + field)
-    }
+  def apply(config: Config): PaymentConfig = {
+    val fileDir: String = config.getString("app.file-dir")
+    val fileRegex: String = config.getString("app.file-regex")
+    val paymentRegex: String = config.getString("app.payment-regex")
+    val journalFilename: String = config.getString("app.journal-file-name")
+    val errorFilename: String = config.getString("app.error-file-name")
+    new PaymentConfig(fileDir, fileRegex, paymentRegex, journalFilename, errorFilename)
   }
-
 }

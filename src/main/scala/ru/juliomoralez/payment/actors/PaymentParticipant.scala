@@ -3,7 +3,7 @@ package ru.juliomoralez.payment.actors
 import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
-import ru.juliomoralez.payment.config.UsersConfig.usersStartValue
+import ru.juliomoralez.payment.config.UsersConfig
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
@@ -15,15 +15,19 @@ case object Minus extends PaymentSign
 case class Payment(sign: PaymentSign, value: Long, participant: ActorRef)
 case object StopPayment
 
-class PaymentParticipant(logPayment: ActorRef) extends Actor{
+class PaymentParticipant(logPayment: ActorRef, usersConfig: UsersConfig) extends Actor{
 
   val DEFAULT_VALUE: Long = 100 // начальное значение баланса, если участник не указан в application.conf
 
   implicit val timeout: Timeout = 5.seconds
-  private var value: Long = 0
+  var value: Long = 0
 
   override def preStart(): Unit = {
-    value = if (usersStartValue.contains(self.path.name)) usersStartValue(self.path.name) else DEFAULT_VALUE
+    value = if (usersConfig.usersStartValue.contains(self.path.name)) {
+      usersConfig.usersStartValue(self.path.name)
+    } else {
+      DEFAULT_VALUE
+    }
   }
 
   def receive: Receive = {
