@@ -7,6 +7,7 @@ import akka.event.LoggingAdapter
 import com.typesafe.config.ConfigFactory
 import ru.juliomoralez.payment.actors.{LogPayment, PaymentsReader, Start}
 import ru.juliomoralez.payment.config.{PaymentConfig, ProgramConfig, UsersConfig}
+import ru.juliomoralez.payment.util.Const.USERS_CONFIG_FILE_PATH
 import ru.juliomoralez.payment.util.LoggerFactory
 
 import scala.util.Try
@@ -15,7 +16,7 @@ object Main extends LoggerFactory{
 
   implicit val system: ActorSystem = ActorSystem("system")
   lazy private val log: LoggingAdapter = newLogger(system)
-  val usersFileName: String = "src/main/resources/users.conf"
+
 
   def main(args: Array[String]): Unit = {
     safeReadConfig().fold(terminateProgram, starting)
@@ -26,7 +27,7 @@ object Main extends LoggerFactory{
   private def safeReadConfig(): Try[ProgramConfig] = {
     Try{
       val paymentConfig: PaymentConfig = PaymentConfig(ConfigFactory.load())
-      val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(usersFileName)))
+      val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(USERS_CONFIG_FILE_PATH)))
       ProgramConfig(paymentConfig, usersConfig)
     }
   }

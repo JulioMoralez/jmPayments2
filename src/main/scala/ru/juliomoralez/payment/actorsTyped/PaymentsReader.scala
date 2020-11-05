@@ -4,19 +4,13 @@ import java.io.StreamCorruptedException
 import java.nio.file.{Files, Path, Paths}
 
 import akka.NotUsed
-import akka.actor.typed.scaladsl.AskPattern.Askable
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
-import akka.dispatch.MessageDispatcher
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.stream.{ActorAttributes, Supervision}
-import akka.util.{ByteString, Timeout}
-import ru.juliomoralez.payment.actorsTyped.PaymentChecker.paymentCheckerOp
+import akka.util.ByteString
 import ru.juliomoralez.payment.config.ProgramConfig
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 sealed trait PaymentsReaderOperation
@@ -24,13 +18,13 @@ case class Start() extends PaymentsReaderOperation
 
 object PaymentsReader {
 
-  def paymentsReaderOp(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]): Behavior[PaymentsReaderOperation] = {
+  def apply(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]): Behavior[PaymentsReaderOperation] = {
     Behaviors.receive { (context, message) =>
 
       def start(): Behavior[PaymentsReaderOperation] = {
         val fileDir: String = programConfig.paymentConfig.fileDir
         val fileRegex: String = programConfig.paymentConfig.fileRegex
-        val paymentChecker: ActorRef[String] = context.spawn(paymentCheckerOp(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]), "paymentChecker")
+        val paymentChecker: ActorRef[String] = context.spawn(PaymentChecker(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]), "paymentChecker")
 
         def getFiles(fileDir: String, fileRegex: String): Iterator[Path] = {
           Files

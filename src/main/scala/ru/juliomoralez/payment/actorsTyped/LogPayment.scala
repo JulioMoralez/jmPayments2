@@ -13,8 +13,7 @@ case class AddJournalMessage(message: String) extends JournalOperation
 
 object LogPayment {
 
-  def logPaymentOp(paymentConfig: PaymentConfig): Behavior[JournalOperation] = {
-
+  def apply(paymentConfig: PaymentConfig): Behavior[JournalOperation] = {
     val errorFilename: String = paymentConfig.errorFilename
     val journalFilename: String = paymentConfig.journalFilename
     val now:String = "\n" + new Date().toString
@@ -25,7 +24,7 @@ object LogPayment {
 
       def addMessage(text: String, filename: String): Behavior[JournalOperation] = {
         context.log.info(text)
-        writeToFile(text, filename)
+        writeToFile(text, filename) // убрать запись в файл
         Behaviors.same
       }
 

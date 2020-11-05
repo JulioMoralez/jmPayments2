@@ -13,7 +13,7 @@ case object StopPayment extends PaymentOperation
 case object PrintValue extends PaymentOperation
 
 object PaymentParticipant {
-  def paymentParticipantOp(value: Long = 0, logPayment: ActorRef[JournalOperation]): Behavior[PaymentOperation] =
+  def apply(value: Long = 0, logPayment: ActorRef[JournalOperation]): Behavior[PaymentOperation] =
     Behaviors.receive { (context, message) =>
 
       def paymentMinus(p: Payment): Behavior[PaymentOperation] = {
@@ -22,7 +22,7 @@ object PaymentParticipant {
             logPayment ! AddJournalMessage(
               s"Операция '-' ${context.self.path.name} -> ${p.participant.path.name} : ${p.value} успешна. Баланс ${context.self.path.name} = $newValue")
             p.participant ! Payment(Plus, p.value, context.self)
-            paymentParticipantOp(newValue, logPayment)
+            PaymentParticipant(newValue, logPayment)
           } else {
             context.self ! StopPayment
             Behaviors.same
@@ -33,7 +33,7 @@ object PaymentParticipant {
         val newValue = value + p.value
         logPayment ! AddJournalMessage(
           s"Операция '+' ${p.participant.path.name} -> ${context.self.path.name} : ${p.value} успешна. Баланс ${context.self.path.name} = $newValue")
-        paymentParticipantOp(newValue, logPayment)
+        PaymentParticipant(newValue, logPayment)
       }
 
       def stopPayment: Behavior[PaymentOperation] = {
