@@ -1,7 +1,8 @@
-package ru.juliomoralez.payment.actorsTyped
+package ru.juliomoralez.payment.develop
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
+import ru.juliomoralez.payment.actorsTyped.{AddJournalMessage, JournalOperation}
 
 sealed trait PaymentSign
 case object Plus extends PaymentSign

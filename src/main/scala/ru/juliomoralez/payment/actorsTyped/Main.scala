@@ -46,6 +46,6 @@ object PaymentSystem {
 object Main extends App {
   val system = ActorSystem(PaymentSystem(), "system")
 
-  Thread.sleep(5000)
+  Thread.sleep(1000)
   system.terminate()
 }

@@ -54,11 +54,8 @@ object PaymentsReader {
 
         //основной стрим
         implicit val system: ActorSystem[Nothing] = context.system
-//        implicit val blockingExecutionContext: MessageDispatcher = system.dispatchers.lookup("blocking-dispatcher")
-//        implicit val timeout: Timeout = 5.seconds
         source
-          .map(x => {paymentChecker ! x; Thread.sleep(100)} )
-//          .mapAsync(1)(x => )    // с mapAsync пока не получилось
+          .map(paymentChecker ! _)
           .addAttributes(ActorAttributes.supervisionStrategy(decider()))
           .run()
 

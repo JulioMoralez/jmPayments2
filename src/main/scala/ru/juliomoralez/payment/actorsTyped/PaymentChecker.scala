@@ -2,6 +2,7 @@ package ru.juliomoralez.payment.actorsTyped
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
+import ru.juliomoralez.payment.actorsTyped.PaymentParticipantPersist.{Minus, Payment}
 import ru.juliomoralez.payment.config.ProgramConfig
 
 import scala.collection.mutable
@@ -9,7 +10,7 @@ import scala.util.matching.Regex
 
 object PaymentChecker {
 
-  val users: mutable.Map[String, ActorRef[PaymentOperation]] = mutable.Map()
+  val users: mutable.Map[String, ActorRef[PaymentParticipantPersist.PaymentOperation]] = mutable.Map()
 
   def apply(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]): Behavior[String] = {
     Behaviors.receive { (context, message) =>
@@ -22,13 +23,14 @@ object PaymentChecker {
             logPayment ! AddJournalMessage(from + " " + to + " " + value)
 
             def createActor(name: String): Unit = {
-              if (!users.contains(name)) {
+              if (!users.contains(name))
+              {
                 val startValue: Long = if (programConfig.usersConfig.usersStartValue.contains(name)) {
                     programConfig.usersConfig.usersStartValue(name)
                   } else {
                     programConfig.usersConfig.defaultUserValue
                   }
-                val paymentParticipant: ActorRef[PaymentOperation] = context.spawn(PaymentParticipant(startValue, logPayment), name)
+                val paymentParticipant: ActorRef[PaymentParticipantPersist.PaymentOperation] = context.spawn(PaymentParticipantPersist(name, startValue, logPayment), name)
                 users += (name -> paymentParticipant)
               }
             }

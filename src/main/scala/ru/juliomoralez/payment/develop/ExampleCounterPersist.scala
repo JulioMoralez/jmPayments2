@@ -20,7 +20,7 @@ object Counter1 extends Serializable{
 }
 
 class Counter extends PersistentActor with ActorLogging with Serializable{
-  override def persistenceId: String = "example"
+  override def persistenceId: String = "example1"
 
   var state: State = State(count = 0)
 
@@ -35,14 +35,14 @@ class Counter extends PersistentActor with ActorLogging with Serializable{
 
   override def receiveRecover: Receive = {
     case evt: Evt =>
-      updateState(evt)
+//      updateState(evt)
     case SnapshotOffer(_, snapshot: State) =>
       println("S " + snapshot)
       state = snapshot
   }
 
   override def receiveCommand: Receive = {
-    case cmd @ Cmd(op) =>
+    case Cmd(op) =>
       persist(Evt(op)) { evt => updateState(evt)}
     case "print" =>
       println("P " + state)
@@ -50,7 +50,7 @@ class Counter extends PersistentActor with ActorLogging with Serializable{
 }
 
 object Main extends App {
-  val system: ActorSystem = ActorSystem("system1")
+  val system: ActorSystem = ActorSystem("system")
   val counter: ActorRef = system.actorOf(Props[Counter])
 
   counter ! Cmd(Inc(3))
