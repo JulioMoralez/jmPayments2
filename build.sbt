@@ -10,12 +10,10 @@ val slf4jVersion = "1.7.30"
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
   "com.typesafe.akka" %% "akka-remote" % akkaVersion,
 )
-
 
 libraryDependencies += "org.slf4j" % "slf4j-api" % slf4jVersion
 libraryDependencies += "org.slf4j" % "slf4j-simple" % slf4jVersion

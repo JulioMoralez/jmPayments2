@@ -2,46 +2,51 @@ package ru.juliomoralez.payment
 
 import java.io.File
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.event.LoggingAdapter
+import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import com.typesafe.config.ConfigFactory
-import ru.juliomoralez.payment.actors.{LogPayment, PaymentsReader, Start}
+import ru.juliomoralez.payment.actorsTyped._
 import ru.juliomoralez.payment.config.{PaymentConfig, ProgramConfig, UsersConfig}
 import ru.juliomoralez.payment.util.Const.USERS_CONFIG_FILE_PATH
-import ru.juliomoralez.payment.util.LoggerFactory
 
 import scala.util.Try
 
-object Main extends LoggerFactory{
 
-  implicit val system: ActorSystem = ActorSystem("system")
-  lazy private val log: LoggingAdapter = newLogger(system)
+object PaymentSystem {
 
+  def apply(): Behavior[Any] =
+    Behaviors.setup { context =>
+      context.log.info("Program start")
+      safeReadConfig().fold(terminateProgram, starting)
 
-  def main(args: Array[String]): Unit = {
-    safeReadConfig().fold(terminateProgram, starting)
-    Thread.sleep(20000)
-    system.terminate()
-  }
+      def safeReadConfig(): Try[ProgramConfig] = {
+        Try{
+          val paymentConfig: PaymentConfig = PaymentConfig(ConfigFactory.load())
+          val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(USERS_CONFIG_FILE_PATH)))
+          ProgramConfig(paymentConfig, usersConfig)
+        }
+      }
 
-  private def safeReadConfig(): Try[ProgramConfig] = {
-    Try{
-      val paymentConfig: PaymentConfig = PaymentConfig(ConfigFactory.load())
-      val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(USERS_CONFIG_FILE_PATH)))
-      ProgramConfig(paymentConfig, usersConfig)
+      def starting(programConfig: ProgramConfig): Unit = {
+          val logPayment: ActorRef[JournalOperation] = context.spawn(LogPayment(programConfig.paymentConfig), "logPayment")
+          val paymentsReader: ActorRef[PaymentsReaderOperation] = context.spawn(
+            PaymentsReader(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]), "paymentsReader")
+          paymentsReader ! Start()
+      }
+
+      def terminateProgram(ex: Throwable): Unit = {
+        context.log.error("Program error", ex)
+        context.log.info("Terminating the actor system")
+        context.system.terminate()
+      }
+
+      Behaviors.same
     }
-  }
+}
 
-  private def starting(programConfig: ProgramConfig): Unit = {
-    val logPayment: ActorRef = system.actorOf(Props(classOf[LogPayment], log, programConfig), "logPayment")
-    val paymentsReader: ActorRef = system.actorOf(Props(classOf[PaymentsReader], system, log, logPayment, programConfig), "paymentsReader")
-    paymentsReader ! Start
-  }
+object Main extends App {
+  val system = ActorSystem(PaymentSystem(), "system")
 
-
-  private def terminateProgram(ex: Throwable): Unit = {
-    log.error("Program error " + ex)
-    log.info("Terminating the actor system")
-    system.terminate()
-  }
+  Thread.sleep(1000)
+  system.terminate()
 }

@@ -5,3 +5,6 @@
 /Journal.log
 /Error.log
 /journal/
+/src/main/scala/ru/juliomoralez/payment/develop/
+/src/main/scala/ru/juliomoralez/payment/actors/
+/snapshots/
