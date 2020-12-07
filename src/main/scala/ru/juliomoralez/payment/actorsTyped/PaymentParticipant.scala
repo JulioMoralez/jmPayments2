@@ -4,17 +4,18 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, Recovery}
+import ru.juliomoralez.payment.actorsTyped.LogPayment.{InfoMessage, JournalOperation}
 
-object PaymentParticipantPersist {
+object PaymentParticipant extends Serializable {
 
   sealed trait PaymentSign
-  case object Plus extends PaymentSign
-  case object Minus extends PaymentSign
+  final case object Plus extends PaymentSign
+  final case object Minus extends PaymentSign
 
   sealed trait PaymentOperation
-  case class Payment(sign: PaymentSign, value: Long, participant: ActorRef[PaymentParticipantPersist.PaymentOperation]) extends PaymentOperation
-  case class StopPayment(p: Payment) extends PaymentOperation
-  case object PrintValue extends PaymentOperation
+  final case class Payment(sign: PaymentSign, value: Long, participant: ActorRef[PaymentParticipant.PaymentOperation]) extends PaymentOperation
+  final case class StopPayment(p: Payment) extends PaymentOperation
+  final case object PrintValue extends PaymentOperation
 
   sealed trait Event
   final case class Changed(balance: Long) extends Event
@@ -27,8 +28,8 @@ object PaymentParticipantPersist {
       def paymentMinus(p: Payment, state: State): Long = {
         if ((state.balance - p.value) >= 0) {
           val newBalance = state.balance - p.value
-          logPayment ! AddJournalMessage(
-            s"Операция '-' ${context.self.path.name} -> ${p.participant.path.name} : ${p.value} успешна. Баланс ${context.self.path.name} = $newBalance")
+          logPayment ! InfoMessage(
+            s"Payment successful `-` ${context.self.path.name} -> ${p.participant.path.name} : ${p.value}. Balance ${context.self.path.name} = $newBalance")
           p.participant ! Payment(Plus, p.value, context.self)
           newBalance
         } else {
@@ -39,19 +40,18 @@ object PaymentParticipantPersist {
 
       def paymentPlus(p: Payment, state: State): Long = {
         val newBalance = state.balance + p.value
-        logPayment ! AddJournalMessage(
-          s"Операция '+' ${p.participant.path.name} -> ${context.self.path.name} : ${p.value} успешна. Баланс ${context.self.path.name} = $newBalance")
+        logPayment ! InfoMessage(
+          s"Payment successful `+` ${p.participant.path.name} -> ${context.self.path.name} : ${p.value}. Balance ${context.self.path.name} = $newBalance")
         newBalance
       }
 
       def printValue(state: State): Unit = {
         context.log.info(s"${context.self.path.name} balance=${state.balance}")
-
       }
 
       def stopPayment(p: Payment, state: State): Unit = {
-        logPayment ! AddJournalMessage(
-          s"Отмена ${context.self.path.name} -> ${p.participant.path.name} : ${p.value} Недостаточно средств. Баланс ${context.self.path.name} = ${state.balance}")
+        logPayment ! InfoMessage(
+          s"Canceling a payment ${context.self.path.name} -> ${p.participant.path.name} : ${p.value} . Balance ${context.self.path.name} = ${state.balance}")
       }
 
       val commandHandler: (State, PaymentOperation) => Effect[Event, State] = { (state, command) =>

@@ -6,17 +6,15 @@ final case class PaymentConfig(
     fileDir: String,
     fileRegex: String,
     paymentRegex: String,
-    journalFilename: String,
-    errorFilename: String)
+    usersConfigFilepath: String)
 
 object PaymentConfig extends Serializable {
 
   def apply(config: Config): PaymentConfig = {
-    val fileDir: String = config.getString("app.file-dir")
-    val fileRegex: String = config.getString("app.file-regex")
-    val paymentRegex: String = config.getString("app.payment-regex")
-    val journalFilename: String = config.getString("app.journal-file-name")
-    val errorFilename: String = config.getString("app.error-file-name")
-    new PaymentConfig(fileDir, fileRegex, paymentRegex, journalFilename, errorFilename)
+    val fileDir = config.getString("app.file-dir")
+    val fileRegex = config.getString("app.file-regex")
+    val paymentRegex = config.getString("app.payment-regex")
+    val usersConfigFilepath = config.getString("app.users-config-filepath")
+    new PaymentConfig(fileDir, fileRegex, paymentRegex, usersConfigFilepath)
   }
 }

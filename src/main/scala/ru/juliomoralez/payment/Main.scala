@@ -1,16 +1,15 @@
 package ru.juliomoralez.payment
 
 import java.io.File
-
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import com.typesafe.config.ConfigFactory
+import ru.juliomoralez.payment.actorsTyped.LogPayment.JournalOperation
+import ru.juliomoralez.payment.actorsTyped.PaymentsReader.{PaymentsReaderOperation, Start}
 import ru.juliomoralez.payment.actorsTyped._
 import ru.juliomoralez.payment.config.{PaymentConfig, ProgramConfig, UsersConfig}
-import ru.juliomoralez.payment.util.Const.USERS_CONFIG_FILE_PATH
 
 import scala.util.Try
-
 
 object PaymentSystem {
 
@@ -21,14 +20,14 @@ object PaymentSystem {
 
       def safeReadConfig(): Try[ProgramConfig] = {
         Try{
-          val paymentConfig: PaymentConfig = PaymentConfig(ConfigFactory.load())
-          val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(USERS_CONFIG_FILE_PATH)))
+          val paymentConfig = PaymentConfig(ConfigFactory.load())
+          val usersConfig = UsersConfig(ConfigFactory.parseFile(new File(paymentConfig.usersConfigFilepath)))
           ProgramConfig(paymentConfig, usersConfig)
         }
       }
 
       def starting(programConfig: ProgramConfig): Unit = {
-          val logPayment: ActorRef[JournalOperation] = context.spawn(LogPayment(programConfig.paymentConfig), "logPayment")
+          val logPayment = context.spawn(LogPayment(programConfig.paymentConfig), "logPayment")
           val paymentsReader: ActorRef[PaymentsReaderOperation] = context.spawn(
             PaymentsReader(programConfig: ProgramConfig, logPayment: ActorRef[JournalOperation]), "paymentsReader")
           paymentsReader ! Start()
